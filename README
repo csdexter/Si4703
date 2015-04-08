@@ -1,0 +1,40 @@
+Arduino Si4703 (and family) Library
+
+This library is intended for use with the SparkFun Si4703 Evaluation or Breakout
+Board, however it should work with most Si470x chips that share the same command
+language. At the time of this writing, the list includes: Si4700->Si4703.
+
+To the furthest extent that this is legally possible, the fork maintained by
+Radu - Eosif Mihailescu and published here https://github.com/csdexter/Si4703
+is hereby released under the LGPL version 3.
+To the furthest extent that this is legally enforceable, the copyright remains
+with the authors listed above.
+
+See the example sketches to learn how to use the library in your code. Note
+that RDS decoding functionality is implemented by the RDSDecoder library.
+
+HARDWARE NOTES:
+ * The Si4703 is a 3.3V I/O chip whereas the Arduino Uno/Mega are 5V I/O. This
+   means you will need to use logic level shifters if you are trying to use
+   the either of the SparkFun boards with the latter. The chip technically
+   supports two interfaces, I2C and a one-wire version of SPI. Since the latter
+   is not trivial to bit-bang on the Arduino (not being true SPI), this library
+   only uses I2C to talk to the chip. In that context, ONLY the BOB-11955 will
+   work for logic level shifting if using a 5V I/O Arduino.
+ * The library assumes an external 32768Hz crystal oscillator is present and 
+   properly connected to the chip, as detailed in the datasheet. If that's not
+   the case, you will have to tell the library and provide the reference clock
+   yourself via other means.
+ * Quick connection reference:
+   I2C Mode, Si4703 -> Arduino:
+     SDIO      -> SDA     (Arduino bidirectional)
+     SCLK      -> SCL     (Arduino output)
+     #SEN      -> SS      (Arduino output or tied high to select I2C mode)
+     #RESET    -> D9      (Arduino output)
+     GPO1      -> left floating
+     GPO2/#INT -> D2/INT0 (Arduino input)
+                  or (left floating, if not using interrupts)
+     GPO3      -> left floating
+
+For general questions and updates on this library please contact the fork
+maintainer at <radu.mihailescu@linux360.ro>.
