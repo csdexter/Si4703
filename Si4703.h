@@ -8,7 +8,6 @@
  * See the example sketches to learn how to use the library in your code.
  *
  * This is the main include file for the library.
- *
  */
 
 #ifndef _SI4703_H_INCLUDED
@@ -168,6 +167,18 @@
 #define SI4703_BLERD_U (0x3 << 10)
 #define SI4703_READCHAN_MASK 0x03FF
 
+//Commands
+#define SI4703_CMD_SET_PROPERTY 0x07
+#define SI4703_CMD_GET_PROPERTY 0x08
+#define SI4703_CMD_VERIFY_COMMAND 0xFF
+
+//Properties
+#define SI4703_PROP_FM_DETECTOR_SNR 0x0200
+#define SI4703_PROP_BLEND_MONO_RSSI 0x0300
+#define SI4703_PROP_BLEND_STEREO_RSSI 0x0301
+#define SI4703_PROP_CALCODE 0x0700
+#define SI4703_PROP_SNRDB 0x0C00
+
 class Si4703
 {
     public:
@@ -201,10 +212,10 @@ class Si4703
         *   band limits.
         *   This function must be called before any other radio command.
         * Parameters:
-        *   band        - The desired radio mode, one of the SI4703_BAND_*
+        *   band        - the desired FM band, one of the SI4703_BAND_*
         *                 constants.
-        *   xosc        - A 32768Hz external oscillator is present.
-        *   interrupt   - Interrupt mode is to be used (as opposed to polling)
+        *   xosc        - a 32768Hz external oscillator is present.
+        *   interrupt   - interrupt mode is to be used (as opposed to polling)
         *                 when waiting for the chip to perform an operation.
         */
         void begin(byte band, bool xosc = true, bool interrupt = false);
@@ -302,6 +313,22 @@ class Si4703
     private:
         byte _pinReset, _pinGPIO2, _pinSEN;
         bool _interrupt, _seeking;
+        static volatile word _registers[SI4703_LAST_REGISTER];
+
+        /*
+        * Description:
+        *   Update the register file in bulk as the Si4703 doesn't support
+        *   random access to its registers via I2C.
+        * Parameters:
+        *   all  - read the entire register file, as opposed to just the
+        *          readable registers (0xA->0xF)
+        *   test - include register TEST1 (0x7) in the write operation,
+        *          otherwise stop at the writable registers (0x2->0x6)
+        *   cmd  - a command is to be sent via the RDS registers, write the
+        *          entire register file up to 0xF
+        */
+        void getRegisterBulk(bool all = false);
+        void setRegisterBulk(bool test = false, bool cmd = false);
 
         /*
         * Description:
