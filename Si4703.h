@@ -24,15 +24,15 @@
 //SDIO and SCLK always connected to SDA and SCL
 #define SI4703_PIN_SEN SS
 #define SI4703_PIN_RESET 9
-#define SI4703_PIN_GPO2 2
+#define SI4703_PIN_GPIO2 2
 
 //Constants for hardwired pins
 //Chip interfaced via I2C, SEN tied high in hardware
 //Define both HW and HWH constants to suit both semantics when typing
 #define SI4703_PIN_SEN_HW 0xFF
-#define SI4735_PIN_SEN_HWH 0xFF
-//GPO/#INT not used, pin left floating
-#define SI4735_PIN_GPO2_HW 0xFF
+#define SI4703_PIN_SEN_HWH 0xFF
+//GPIO2/#INT not used, pin left floating
+#define SI4703_PIN_GPIO2_HW 0xFF
 
 class Si4703
 {
@@ -53,7 +53,7 @@ class Si4703
         *               Boards already provided.
         */
         Si4703(byte pinReset = SI4703_PIN_RESET,
-               byte pinGPO2 = SI4703_PIN_GPO2, byte pinSEN = SI4703_PIN_SEN);
+               byte pinGPIO2 = SI4703_PIN_GPIO2, byte pinSEN = SI4703_PIN_SEN);
 
         /*
         * Description:
@@ -166,8 +166,7 @@ class Si4703
         word getProperty(word property);
 
     private:
-        byte _pinReset, _pinGPO2, _pinSEN;
-        static byte _i2caddr;
+        byte _pinReset, _pinGPIO2, _pinSEN;
         bool _interrupt, _seeking;
 
         /*
