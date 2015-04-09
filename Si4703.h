@@ -179,6 +179,8 @@
 #define SI4703_PROP_CALCODE 0x0700
 #define SI4703_PROP_SNRDB 0x0C00
 
+extern const byte Si4703_ChannelSpacings[];
+
 class Si4703
 {
     public:
@@ -310,10 +312,29 @@ class Si4703
         */
         word getProperty(word property);
 
+        /*
+        * Description:
+        *   Accessor for the status register.
+        */
+        word getStatus(void) { return _registers[SI4703_REG_STATUSRSSI]; };
+
     private:
         byte _pinReset, _pinGPIO2, _pinSEN;
         bool _interrupt, _seeking;
         static volatile word _registers[SI4703_LAST_REGISTER];
+        word _response[4];
+
+        /*
+        * Description:
+        *   Used to send a command and its arguments to the radio chip.
+        * Parameters:
+        *   command - the command byte, see datasheet and use one of the
+        *             SI4703_CMD_* constants
+        *   arg1-7  - command arguments, see the Si4703 Programmers Guide.
+        */
+        void sendCommand(byte command, byte arg0 = 0, byte arg1 = 0,
+                         byte arg2 = 0, byte arg3 = 0, byte arg4 = 0,
+                         byte arg5 = 0, byte arg6 = 0);
 
         /*
         * Description:
@@ -327,7 +348,7 @@ class Si4703
         *   cmd  - a command is to be sent via the RDS registers, write the
         *          entire register file up to 0xF
         */
-        void getRegisterBulk(bool all = false);
+        static void getRegisterBulk(bool all = false);
         void setRegisterBulk(bool test = false, bool cmd = false);
 
         /*
@@ -336,7 +357,7 @@ class Si4703
         * Parameters:
         *   which - interrupt flag to wait for, see SI4703_STATUS_*
         */
-        void waitForInterrupt(byte which);
+        void waitForInterrupt(word which);
 
         /*
         * Description:
@@ -346,7 +367,8 @@ class Si4703
 
         /*
         * Description:
-        *   Services interrupts from the Si4703.
+        *
+        * Services interrupts from the Si4703.
         */
         static void interruptServiceRoutine(void);
 };
