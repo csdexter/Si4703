@@ -104,9 +104,9 @@ word Si4703::getFrequency(void) {
     return (
         (_registers[SI4703_REG_SYSCONFIG2] & SI4703_BAND_MASK ==
             SI4703_BAND_WEST) ? 8750 : 7600) +
-        _registers[SI4703_REG_READCHAN] & SI4703_READCHAN_MASK *
+        (_registers[SI4703_REG_READCHAN] & SI4703_READCHAN_MASK) *
         pgm_read_byte(&Si4703_ChannelSpacings[
-            _registers[SI4703_REG_SYSCONFIG2] & SI4703_SPACE_MASK >> 4]);
+            (_registers[SI4703_REG_SYSCONFIG2] & SI4703_SPACE_MASK) >> 4]);
 }
 
 void Si4703::seekUp(bool wrap) {
@@ -278,6 +278,7 @@ void Si4703::completeTune(void) {
 
     //Reset STC and SF/BL flags
     _registers[SI4703_REG_POWERCFG] &= ~SI4703_FLG_SEEK;
+    setRegisterBulk();
 }
 
 void Si4703::interruptServiceRoutine(void) {
