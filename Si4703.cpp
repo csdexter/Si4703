@@ -16,6 +16,10 @@
 
 #include <Wire.h>
 
+#include <string.h>
+
+#include <util/atomic.h>
+
 Si4703::Si4703(byte pinReset, byte pinGPIO2, byte pinSEN) {
     _pinReset = pinReset;
     _pinGPIO2 = pinGPIO2;
@@ -234,10 +238,7 @@ void Si4703::sendCommand(byte command, byte arg0, byte arg1, byte arg2,
         getRegisterBulk();
     //Copy the (now valid) response bytes over as re-enabling RDS below may
     //immediately trigger an interrupt which will clobber our data.
-    _response[0] = _registers[SI4703_REG_RDSA];
-    _response[1] = _registers[SI4703_REG_RDSB];
-    _response[2] = _registers[SI4703_REG_RDSC];
-    _response[3] = _registers[SI4703_REG_RDSD];
+    memcpy(_response, (void *)&_registers[SI4703_REG_RDSA], sizeof(_response));
 
     //Restore previous RDS state
     if(previousRDS) {
@@ -257,6 +258,16 @@ word Si4703::getProperty(word property) {
 
     return _response[0];
 }
+
+bool Si4703::readRDSGroup(word* block) {
+    if(_haveRds) {
+        ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+            memcpy(block, (void *)_rdsBlocks, sizeof(_rdsBlocks));
+            _haveRds = false;
+        };
+    } else
+        return false;
+};
 
 void Si4703::getRegisterBulk(bool all) {
     const byte count = all ? SI4703_LAST_REGISTER : 6;
@@ -298,6 +309,10 @@ void Si4703::waitForInterrupt(word which) {
 void Si4703::completeTune(void) {
     waitForInterrupt(SI4703_STATUS_STC);
 
+    //Clear RDS state
+    memset((void *)_rdsBlocks, 0x00, sizeof(_rdsBlocks));
+    _haveRds = false;
+
     //Reset STC and SF/BL flags
     _registers[SI4703_REG_POWERCFG] &= ~SI4703_FLG_SEEK;
     setRegisterBulk();
@@ -305,6 +320,21 @@ void Si4703::completeTune(void) {
 
 void Si4703::interruptServiceRoutine(void) {
     getRegisterBulk();
+
+    if(_registers[SI4703_REG_STATUSRSSI] & SI4703_STATUS_RDSR) {
+        //A future call to getRegisterBulk() may clobber the RDS group the chip
+        //is trying to give us righ now, so copy this one over if it's good
+        //enough to save.
+        if(!(_registers[SI4703_REG_STATUSRSSI] & SI4703_BLERA_MASK ||
+             _registers[SI4703_REG_READCHAN] & SI4703_BLERB_MASK ||
+             _registers[SI4703_REG_READCHAN] & SI4703_BLERC_MASK ||
+             _registers[SI4703_REG_READCHAN] & SI4703_BLERD_MASK))
+            memcpy((void *)_rdsBlocks, (void *)&_registers[SI4703_REG_RDSA],
+                   sizeof(_rdsBlocks));
+            _haveRds = true;
+    };
 }
 
 volatile word Si4703::_registers[] = {0x0000};
+volatile word Si4703::_rdsBlocks[] = {0x0000};
+volatile bool Si4703::_haveRds = false;

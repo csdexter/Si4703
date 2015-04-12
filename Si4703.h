@@ -318,11 +318,29 @@ class Si4703
         */
         word getStatus(void) { return _registers[SI4703_REG_STATUSRSSI]; };
 
+        /*
+        * Description:
+        *   If the chip has received any valid RDS group, fetch it off the chip
+        *   and fill word block[4] with it, returning true; otherwise return
+        *   false without side-effects.
+        *   As RDS has a [mandated by standard] constant transmission rate of
+        *   11.4 groups per second, you should actively call this function (e.g.
+        *   from loop()) so that you read most if not all of the error-corrected
+        *   RDS groups received. For example:
+        *   loop() {
+        *     if(Si4703::readRDSGroup(data))
+        *       RDSDecoder::decodeRDSGroup(data);
+        *   }
+        */
+        bool readRDSGroup(word* block);
+
     private:
         byte _pinReset, _pinGPIO2, _pinSEN;
         bool _interrupt, _seeking;
         static volatile word _registers[SI4703_LAST_REGISTER];
         word _response[4];
+        static volatile word _rdsBlocks[4];
+        static volatile bool _haveRds;
 
         /*
         * Description:
