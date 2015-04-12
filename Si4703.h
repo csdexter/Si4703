@@ -220,7 +220,7 @@ class Si4703
         *   interrupt   - interrupt mode is to be used (as opposed to polling)
         *                 when waiting for the chip to perform an operation.
         */
-        void begin(byte band, bool xosc = true, bool interrupt = false);
+        void begin(byte band, bool xosc = true, bool interrupt = true);
 
         /*
         * Description:
@@ -336,7 +336,7 @@ class Si4703
 
     private:
         byte _pinReset, _pinGPIO2, _pinSEN;
-        bool _interrupt, _seeking;
+        bool _interrupt;
         static volatile word _registers[SI4703_LAST_REGISTER];
         word _response[4];
         static volatile word _rdsBlocks[4];

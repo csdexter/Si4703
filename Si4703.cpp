@@ -24,7 +24,6 @@ Si4703::Si4703(byte pinReset, byte pinGPIO2, byte pinSEN) {
     _pinReset = pinReset;
     _pinGPIO2 = pinGPIO2;
     _pinSEN = pinSEN;
-    _seeking = false;
 }
 
 void Si4703::begin(byte band, bool xosc, bool interrupt) {
@@ -52,8 +51,16 @@ void Si4703::begin(byte band, bool xosc, bool interrupt) {
     //faster than the Uno, mind you) has a clock period of 50ns so no action
     //needed.
 
-    //Configure GPIO2 for hardware interrupts if requested and possible.
-    if(_pinGPIO2 != SI4703_PIN_GPIO2_HW && interrupt) pinMode(_pinGPIO2, INPUT);
+    //Calculate if interrupt mode was requested AND is possible
+    //TODO: this only works on the Uno and Mega, 'cause Arduino could not be
+    //arsed to give us a proper API (attachInterrupt() should take the pin
+    //number as an argument, not some opaque chip-dependent value! Moreover, it
+    //should not use external interrupts (scarce) but pin-change interrupts
+    //(plenty)).
+    _interrupt = interrupt && (_pinGPIO2 == 2 || _pinGPIO2 == 3);
+
+    //Configure GPIO2 for hardware interrupts
+    if(_interrupt) pinMode(_pinGPIO2, INPUT);
 
     //Configure the I2C hardware
     Wire.begin();
@@ -83,21 +90,20 @@ void Si4703::begin(byte band, bool xosc, bool interrupt) {
     //Configure the Si4703 for operation
     _registers[SI4703_REG_POWERCFG] |= SI4703_FLG_RDSM;
     _registers[SI4703_REG_SYSCONFIG1] |= SI4703_FLG_RDS | SI4703_FLG_DE;
-    if(_pinGPIO2 != SI4703_PIN_GPIO2_HW)
+    if(_interrupt)
         _registers[SI4703_REG_SYSCONFIG1] |= (
             SI4703_FLG_RDSIEN | SI4703_FLG_STCIEN | SI4703_GPIO2_INT);
     _registers[SI4703_REG_SYSCONFIG2] |= (
         band | SI4703_SPACE_100K | SI4703_VOLUME_MASK);
-    _registers[SI4703_REG_SYSCONFIG3] |= ((1 << SI4703_SKSNR_SHIFT) | 0x1 );
+    _registers[SI4703_REG_SYSCONFIG3] |= ((1 << SI4703_SKSNR_SHIFT) | 0x1);
     setRegisterBulk();
 
     //The chip is alive and interrupts have been configured on its side, switch
     //ourselves to interrupt operation if so requested and if wiring was
     //properly done.
-    _interrupt = interrupt && _pinGPIO2 != SI4703_PIN_GPIO2_HW;
-
     if (_interrupt) {
-      attachInterrupt(_pinGPIO2, Si4703::interruptServiceRoutine, FALLING);
+      attachInterrupt(_pinGPIO2 == 2 ? 0 : 1, Si4703::interruptServiceRoutine,
+                      FALLING);
       interrupts();
     };
 }
@@ -108,7 +114,7 @@ word Si4703::getFrequency(void) {
     getRegisterBulk();
 
     return (
-        _registers[SI4703_REG_SYSCONFIG2] & SI4703_BAND_MASK ? 7600 : 8650) +
+        _registers[SI4703_REG_SYSCONFIG2] & SI4703_BAND_MASK ? 7600 : 8750) +
         (_registers[SI4703_REG_READCHAN] & SI4703_READCHAN_MASK) *
         pgm_read_byte(&Si4703_ChannelSpacings[
             (_registers[SI4703_REG_SYSCONFIG2] & SI4703_SPACE_MASK) >> 4]);
@@ -264,7 +270,9 @@ bool Si4703::readRDSGroup(word* block) {
         ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
             memcpy(block, (void *)_rdsBlocks, sizeof(_rdsBlocks));
             _haveRds = false;
-        };
+        }
+
+        return true;
     } else
         return false;
 };
@@ -319,7 +327,10 @@ void Si4703::completeTune(void) {
 }
 
 void Si4703::interruptServiceRoutine(void) {
-    getRegisterBulk();
+    NONATOMIC_BLOCK(NONATOMIC_RESTORESTATE) {
+        //Most unfortunately, Wire is interrupt based
+        getRegisterBulk();
+    };
 
     if(_registers[SI4703_REG_STATUSRSSI] & SI4703_STATUS_RDSR) {
         //A future call to getRegisterBulk() may clobber the RDS group the chip
@@ -328,10 +339,11 @@ void Si4703::interruptServiceRoutine(void) {
         if(!(_registers[SI4703_REG_STATUSRSSI] & SI4703_BLERA_MASK ||
              _registers[SI4703_REG_READCHAN] & SI4703_BLERB_MASK ||
              _registers[SI4703_REG_READCHAN] & SI4703_BLERC_MASK ||
-             _registers[SI4703_REG_READCHAN] & SI4703_BLERD_MASK))
+             _registers[SI4703_REG_READCHAN] & SI4703_BLERD_MASK)) {
             memcpy((void *)_rdsBlocks, (void *)&_registers[SI4703_REG_RDSA],
                    sizeof(_rdsBlocks));
             _haveRds = true;
+        };
     };
 }
 
