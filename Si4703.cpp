@@ -77,12 +77,14 @@ void Si4703::begin(byte band, bool xosc, bool interrupt) {
     getRegisterBulk(true);
 
     //Configure the Si4703 for operation
-    _registers[SI4703_REG_SYSCONFIG1] |= SI4703_FLG_RDS;
+    _registers[SI4703_REG_POWERCFG] |= SI4703_FLG_RDSM;
+    _registers[SI4703_REG_SYSCONFIG1] |= SI4703_FLG_RDS | SI4703_FLG_DE;
     if(_pinGPIO2 != SI4703_PIN_GPIO2_HW)
         _registers[SI4703_REG_SYSCONFIG1] |= (
             SI4703_FLG_RDSIEN | SI4703_FLG_STCIEN | SI4703_GPIO2_INT);
     _registers[SI4703_REG_SYSCONFIG2] |= (
         band | SI4703_SPACE_100K | SI4703_VOLUME_MASK);
+    _registers[SI4703_REG_SYSCONFIG3] |= ((1 << SI4703_SKSNR_SHIFT) | 0x1 );
     setRegisterBulk();
 
     //The chip is alive and interrupts have been configured on its side, switch
@@ -102,8 +104,7 @@ word Si4703::getFrequency(void) {
     getRegisterBulk();
 
     return (
-        (_registers[SI4703_REG_SYSCONFIG2] & SI4703_BAND_MASK ==
-            SI4703_BAND_WEST) ? 8750 : 7600) +
+        _registers[SI4703_REG_SYSCONFIG2] & SI4703_BAND_MASK ? 7600 : 8650) +
         (_registers[SI4703_REG_READCHAN] & SI4703_READCHAN_MASK) *
         pgm_read_byte(&Si4703_ChannelSpacings[
             (_registers[SI4703_REG_SYSCONFIG2] & SI4703_SPACE_MASK) >> 4]);
@@ -143,15 +144,23 @@ bool Si4703::volumeUp(void) {
 
     const byte volume = _registers[SI4703_REG_SYSCONFIG2] & SI4703_VOLUME_MASK;
 
-    if(volume == SI4703_VOLUME_MASK)
-        return false;
-    else {
+    if(volume == SI4703_VOLUME_MASK) {
+        if(!(_registers[SI4703_REG_SYSCONFIG3] & SI4703_FLG_VOLEXT))
+            return false;
+        else {
+            //Switch to the higher volume range
+            _registers[SI4703_REG_SYSCONFIG3] &= ~SI4703_FLG_VOLEXT;
+            _registers[SI4703_REG_SYSCONFIG2] =
+                _registers[SI4703_REG_SYSCONFIG2] & ~SI4703_VOLUME_MASK | 0x1;
+        };
+    } else {
         _registers[SI4703_REG_SYSCONFIG2] = _registers[SI4703_REG_SYSCONFIG2] &
                                             ~SI4703_VOLUME_MASK | (volume + 1);
-        setRegisterBulk();
-
-        return true;
     };
+
+    setRegisterBulk();
+
+    return true;
 }
 
 bool Si4703::volumeDown(bool alsomute) {
@@ -159,17 +168,23 @@ bool Si4703::volumeDown(bool alsomute) {
 
     const byte volume = _registers[SI4703_REG_SYSCONFIG2] & SI4703_VOLUME_MASK;
 
-    if(volume) {
+    if(!volume)
+        return false;
+
+    if(volume == 1 && !(_registers[SI4703_REG_SYSCONFIG3] & SI4703_FLG_VOLEXT)) {
+        //Switch to lower volume range
+        _registers[SI4703_REG_SYSCONFIG3] |= SI4703_FLG_VOLEXT;
+        _registers[SI4703_REG_SYSCONFIG2] |= SI4703_VOLUME_MASK;
+    } else
         _registers[SI4703_REG_SYSCONFIG2] = _registers[SI4703_REG_SYSCONFIG2] &
                                             ~SI4703_VOLUME_MASK | (volume - 1);
-        setRegisterBulk();
-        if(!(volume - 1) && alsomute)
-            //If we are to trust the datasheet, this is superfluous as a volume
-            //of zero triggers mute on its own.
-            mute();
-        return true;
-    } else
-        return false;
+
+    setRegisterBulk();
+    if(!(volume - 1) && alsomute)
+        //If we are to trust the datasheet, this is superfluous as a volume
+        //of zero triggers mute on its own.
+        mute();
+    return true;
 }
 
 void Si4703::unMute(bool minvol) {
