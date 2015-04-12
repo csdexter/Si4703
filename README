@@ -16,11 +16,16 @@ that RDS decoding functionality is implemented by the RDSDecoder library.
 HARDWARE NOTES:
  * The Si4703 is a 3.3V I/O chip whereas the Arduino Uno/Mega are 5V I/O. This
    means you will need to use logic level shifters if you are trying to use
-   the either of the SparkFun boards with the latter. The chip technically
+   either of the SparkFun boards with the latter. The chip technically
    supports two interfaces, I2C and a one-wire version of SPI. Since the latter
-   is not trivial to bit-bang on the Arduino (not being true SPI), this library
+   is non-trivial to bit-bang on the Arduino (not being true SPI), this library
    only uses I2C to talk to the chip. In that context, ONLY the BOB-11955 will
-   work for logic level shifting if using a 5V I/O Arduino.
+   work for logic level shifting the I2C lines if using a 5V I/O Arduino. For
+   the other lines (#RST, #SEN and #INT), you can use any of the level
+   translator boards in SparkFun's offering. Note that #RST is special because
+   it already has a pull-down on board, which means the very old
+   resistor divider-based translator will not work -- just use a 10K resistor
+   in series with the #RST line in that case.
  * The library assumes an external 32768Hz crystal oscillator is present and 
    properly connected to the chip, as detailed in the datasheet. If that's not
    the case, you will have to tell the library and provide the reference clock
