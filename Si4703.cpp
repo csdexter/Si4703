@@ -110,16 +110,23 @@ word Si4703::getFrequency(void) {
 }
 
 void Si4703::seekUp(bool wrap) {
-    _registers[SI4703_REG_POWERCFG] |= ((wrap ? 0x00 : SI4703_FLG_SKMODE) |
-                                        SI4703_FLG_SEEKUP | SI4703_FLG_SEEK);
+    if(wrap)
+        _registers[SI4703_REG_POWERCFG] &= ~SI4703_FLG_SKMODE;
+    else
+        _registers[SI4703_REG_POWERCFG] |= SI4703_FLG_SKMODE;
+    _registers[SI4703_REG_POWERCFG] |= (SI4703_FLG_SEEKUP | SI4703_FLG_SEEK);
     setRegisterBulk();
 
     completeTune();
 }
 
 void Si4703::seekDown(bool wrap) {
-    _registers[SI4703_REG_POWERCFG] |= ((wrap ? 0x00 : SI4703_FLG_SKMODE) |
-                                        SI4703_FLG_SEEK);
+    if(wrap)
+        _registers[SI4703_REG_POWERCFG] &= ~SI4703_FLG_SKMODE;
+    else
+        _registers[SI4703_REG_POWERCFG] |= SI4703_FLG_SKMODE;
+    _registers[SI4703_REG_POWERCFG] &= ~SI4703_FLG_SEEKUP;
+    _registers[SI4703_REG_POWERCFG] |= SI4703_FLG_SEEK;
     setRegisterBulk();
 
     completeTune();
